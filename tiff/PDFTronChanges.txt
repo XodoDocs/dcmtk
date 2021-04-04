@@ -1,0 +1,103 @@
+
+------------------------------------------------------------------------------------------
+
++ In /libtiff/tif_close.c
+     /libtiff/tif_dir.c
+     /libtiff/tif_dirread.c
+     /libtiff/tif_dirwrite.c
+     /libtiff/tif_fax3.c
+     /libtiff/tif_flush.c
+     /libtiff/tif_open.c
+     /libtiff/tif_read.c
+     /libtiff/tif_write.c
+
+	Add #include <fcntl.h>
+
+------------------------------------------------------------------------------------------
+
++ In /libtiff/tif_zip.c
+	Change #include "zlib.h" to #include <ZLib/zlib.h>
+
+------------------------------------------------------------------------------------------
+
++ In /libtiff/tiffiop.h
+	Change extern void *lfind(const void *, const void *, size_t *, size_t,
+		   int (*)(const void *, const void *));
+	to extern void *lfind(const void *, const void *, unsigned int*, unsigned int, 
+		   int (*)(const void *, const void *));
+
+------------------------------------------------------------------------------------------
+
++ Modify /libtiff/tiffconfig.vc.h as follows and save as /libtiff/tiffconfig.h
+	comment out #define LOGLUV_SUPPORT 1
+	comment out #define NEXT_SUPPORT 1
+	comment out #define THUNDER_SUPPORT 1
+	add/uncomment JPEG_SUPPORT 1
+	add/uncomment ZIP_SUPPORT 1
+	add #define MDI_SUPPORT 1 /* Support MS MDI magic number files as TIFF */
+	Surround 64-bit types with #ifdef WIN32 and add 
+		#else  /* Linxu, Mac, etc */
+		/* Signed 64-bit type formatter */
+
+		#define TIFF_INT64_FORMAT "%lld"
+
+		/* Signed 64-bit type */
+
+		#define TIFF_INT64_T signed long long
+
+		/* Unsigned 64-bit type formatter */
+
+		#define TIFF_UINT64_FORMAT "%llu"
+
+		/* Unsigned 64-bit type */
+
+		#define TIFF_UINT64_T unsigned long long
+
+		/* Signed size type formatter */
+
+		#define TIFF_SSIZE_FORMAT "%ld"
+
+
+		/* Signed size type */
+
+		#define TIFF_SSIZE_T signed  long
+	(refer to rev.1652)
+
+------------------------------------------------------------------------------------------
+
++ Modify /libtiff/tif_config.vc.h as follows and save as /libtiff/tif_config.h (see rev.1153 & 1686)
+	comment out #define HAVE_IO_H 1
+	comment out #define HAVE_SEARCH_H 1
+	add/uncomment 
+		#ifdef __BIG_ENDIAN__   /* On Mac Power PC */
+		#define WORDS_BIGENDIAN 1
+		#define HAVE_UNISTD_H 1   /* to go around the problem on Mac PowerPC when creating multipage TIFF in PDF2Image */
+ 		#endif
+	surround #define lfind _lfind with
+		#ifdef _WIN32
+			#define lfind _lfind   // On Windows
+		#else 
+			#undef  HAVE_LFIND
+		#endif
+	add 
+		#ifdef WINCE
+		#include<tif_config.wince.h>
+		and surround everything in the #else block.
+------------------------------------------------------------------------------------------
+
++ Modify /libtiff/tif_config.wince.h (see rev.1686)
+	comment out #define  HAVE_FCNTL_H 1
+	comment out #undef HAVE_SYS_TYPES_H
+	comment out #define HAVE_IO_H 1
+	add #define abort wceex_abort
+	add #define fstat wceex_stat
+
+------------------------------------------------------------------------------------------
+
++ Modify /libtiff/tif_win32.c (see rev.1686)
+
+------------------------------------------------------------------------------------------
+
++ Modify /libtiff/tif_unix.c for Windows Mobile support (see rev.7361)
+
+------------------------------------------------------------------------------------------

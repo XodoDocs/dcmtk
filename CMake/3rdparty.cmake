@@ -105,7 +105,7 @@ if(DCMTK_USE_FIND_PACKAGE)
 
   # Find zlib
   if(DCMTK_WITH_ZLIB)
-    find_package(ZLIB QUIET)
+#    find_package(ZLIB QUIET)
     if(NOT ZLIB_FOUND)
       message(STATUS "Warning: ZLIB support will be disabled because zlib was not found.")
       set(WITH_ZLIB "")
@@ -266,9 +266,9 @@ else()
   # libtiff support: configure compiler
   if(DCMTK_WITH_TIFF)
     if(WITH_LIBTIFFINC)
-      set(LIBTIFF_INCDIR "${WITH_LIBTIFFINC}/include")
+      set(LIBTIFF_INCDIR "${WITH_LIBTIFFINC}/libtiff")
       set(LIBTIFF_LIBDIR "${WITH_LIBTIFFINC}/lib")
-      set(LIBTIFF_LIBS debug "${LIBTIFF_LIBDIR}/libtiff_d.lib" optimized "${LIBTIFF_LIBDIR}/libtiff_o.lib")
+      set(LIBTIFF_LIBS debug "${LIBTIFF_LIBDIR}/StaticLibTIFF.lib" optimized "${LIBTIFF_LIBDIR}/libtiff_o.lib")
       message(STATUS "Info: DCMTK TIFF support will be enabled")
       set(WITH_LIBTIFF 1)
     else() # turn off library if library path not set
@@ -309,9 +309,9 @@ else()
   # zlib support: configure compiler
   if(DCMTK_WITH_ZLIB)
     if(WITH_ZLIBINC)
-      set(ZLIB_INCDIR "${WITH_ZLIBINC}/include")
+      set(ZLIB_INCDIR "${WITH_ZLIBINC}")
       set(ZLIB_LIBDIR "${WITH_ZLIBINC}/lib")
-      set(ZLIB_LIBS debug "${ZLIB_LIBDIR}/zlib_d.lib" optimized "${ZLIB_LIBDIR}/zlib_o.lib")
+      set(ZLIB_LIBS debug "${ZLIB_LIBDIR}/StaticLibZ.lib" optimized "${ZLIB_LIBDIR}/zlib_o.lib")
       message(STATUS "Info: DCMTK ZLIB support will be enabled")
       set(WITH_ZLIB 1)
     else() # turn off library if library path not set
