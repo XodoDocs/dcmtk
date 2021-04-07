@@ -45,7 +45,7 @@
 #endif
 #if defined(WIDE_CHAR_MAIN_FUNCTION) && defined(DCMTK_USE_WCHAR_T)
 // Windows-specific version supporting wide character encoding (UTF-16)
-# define DCMTK_MAIN_FUNCTION int wmain(int argc, wchar_t *argv[])
+# define DCMTK_MAIN_FUNCTION int wmain(int argc, wchar_t *wargv[])
 #else
 // default version supporting various character encodings (incl. UTF-8)
 # define DCMTK_MAIN_FUNCTION int main(int argc, char *argv[])

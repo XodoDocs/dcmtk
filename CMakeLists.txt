@@ -30,7 +30,7 @@ set(DCMTK_MODULES ofstd oflog dcmdata dcmimgle
   CACHE STRING "List of modules that should be built.")
 
 # Include directories
-set(DCMTK_INCLUDE_DIR "${DCMTK_BINARY_DIR}/config/include")
+set(DCMTK_INCLUDE_DIR "${DCMTK_BINARY_DIR}/config/include" "${CMAKE_SOURCE_DIR}")
 foreach(inc ${DCMTK_MODULES})
   list(APPEND DCMTK_INCLUDE_DIR "${DCMTK_SOURCE_DIR}/${inc}/include")
 endforeach()

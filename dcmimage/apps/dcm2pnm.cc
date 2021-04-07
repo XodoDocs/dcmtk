@@ -20,6 +20,14 @@
  */
 
 
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/filewritestream.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/filereadstream.h"
+
+
 #include "dcmtk/config/osconfig.h"    /* make sure OS specific configuration is included first */
 
 #define INCLUDE_CSTDIO
@@ -40,6 +48,9 @@
 
 #include "dcmtk/dcmimage/diregist.h"     /* include to support color images */
 #include "dcmtk/ofstd/ofstd.h"           /* for OFStandard */
+
+#include "dcmtk/dcmdata/dcistrmb.h"
+#include "dcmtk/dcmdata/dcostrmf.h"
 
 #ifdef BUILD_DCM2PNM_AS_DCMJ2PNM
 #include "dcmtk/dcmjpeg/djdecode.h"      /* for dcmjpeg decoders */
@@ -118,10 +129,254 @@ enum E_FileType
 
 // ********************************************
 
-int main(int argc, char *argv[])
+#ifdef DCMTK_USE_WCHAR_T
+static inline char *create_utf8_string(const wchar_t *wideChar)
+{
+	char *utf8;
+	int	count;
+
+	count = WideCharToMultiByte(CP_UTF8, 0, wideChar, -1, NULL, 0, NULL, NULL);
+	if (count < 0)
+		return((char *)NULL);
+	utf8 = (char *) malloc((count + 1) * sizeof(*utf8));
+	if (utf8 == (char *)NULL)
+		return((char *)NULL);
+	count = WideCharToMultiByte(CP_UTF8, 0, wideChar, -1, utf8, count, NULL, NULL);
+	if (count == 0)
+	{
+		if (utf8 != NULL)
+		{
+			free(utf8);
+		}
+		return((char *)NULL);
+	}
+	utf8[count] = 0;
+	return(utf8);
+}
+#endif
+
+static inline FILE *fopen_utf8(const char *path, const char *mode)
+{
+#if !defined(DCMTK_USE_WCHAR_T)
+	return(fopen(path, mode));
+#else
+	FILE
+		*file;
+
+	const wchar_t
+		*mode_wide,
+		*path_wide;
+
+	OFFilename path_OF(path, true);
+	path_wide = path_OF.getWideCharPointer();
+	if (path_wide == (wchar_t *)NULL)
+	{
+		return((FILE *)NULL);
+	}
+	OFFilename mode_OF(mode, true);
+	mode_wide = mode_OF.getWideCharPointer();
+	if (mode_wide == (wchar_t *)NULL)
+	{
+		return((FILE *)NULL);
+	}
+	file = _wfopen(path_wide, mode_wide);
+	return(file);
+#endif
+}
+
+char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_file_str)
+{
+	char** utf8 = NULL;
+
+	assert(argc == 3);
+
+	char* json_file = argv[2];
+	FILE *fopen = fopen_utf8(json_file, "rb");
+	if (!fopen)
+	{
+		printf("Could not open file %s for reading!\n", argv[1]);
+		return NULL;
+	}
+
+	char *buffer = NULL;
+	int string_size, read_size;
+
+	argc--;
+	if (fopen)
+	{
+		// Seek the last byte of the file
+		fseek(fopen, 0, SEEK_END);
+		// Offset from the first to the last byte, i.e., the size of the file
+		string_size = ftell(fopen);
+		// go back to the start of the file
+		rewind(fopen);
+
+		// Allocate a string that can hold it all
+		buffer = (char*)malloc(sizeof(char) * (string_size + 1));
+		if (!buffer)
+		{
+			printf("Could not allocate memory needed!\n");
+			return NULL;
+		}
+
+		// Read the entire file in one operation
+		read_size = fread(buffer, sizeof(char), string_size, fopen);
+
+		buffer[string_size] = '\0';
+
+		fclose(fopen);
+
+		if (string_size != read_size)
+		{
+			printf("Could not read the file %s properly!\n", argv[1]);
+			// the buffer to NULL
+			free(buffer);
+			return NULL;
+		}
+	}
+
+	rapidjson::Document document;
+	if (document.Parse(buffer).HasParseError())
+	{
+		printf("Could not parse the JSON file %s\n", argv[1]);
+		free(buffer);
+		return NULL;
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// 2. Access values in document.
+
+	printf("\nAccess values in document:\n");
+	assert(document.IsObject());    // Document is a JSON value represents the root of DOM. Root can be either an object or array.
+
+	assert(document.HasMember("User-options"));
+	assert(document["User-options"].IsObject());
+	assert(document["Input-file"].IsString());
+	assert(document["Output-file"].IsString());
+
+	rapidjson::Value::MemberIterator    M;
+	const char                        *key_char, *value_char;
+	char *input_file, *auto_level, *output_file, *format_option, *const_tiff, *units_str, *ppi_str, *density_str, *density_value;
+
+	if (document["Input-file"].IsString())
+	{
+		value_char = document["Input-file"].GetString();
+		input_file = (char *)malloc(strlen(value_char) + 1);
+		strcpy(input_file, value_char);
+		argc++;
+	}
+
+	if (document["Output-file"].IsString())
+	{
+		value_char = document["Output-file"].GetString();;
+		output_file = (char *)malloc(strlen(value_char) + 1);
+		strcpy(output_file, value_char);
+		output_file_str = output_file;
+	}
+
+	M = document["User-options"].MemberBegin();
+	while (M != document["User-options"].MemberEnd())
+	{
+		key_char = M->name.GetString();
+
+		if (strcmp(key_char, "Default-dpi") == 0)
+		{
+			dpi_value = M->value.GetDouble();
+		}
+
+		if (strcmp(key_char, "Enable-auto-level") == 0)
+		{
+			bool auto_level_enabled = M->value.GetBool();
+			if (auto_level_enabled)
+			{
+				auto_level = strdup("--min-max-window");
+				argc += 1;
+			}
+		}
+		M++;
+	}
+
+	utf8 = (char **) malloc(argc * sizeof(*utf8));
+	if (utf8 == (char **)NULL)
+	{
+		printf("Error with memory allocation\n");
+		return NULL;
+	}
+
+	utf8[0] = argv[0];
+	utf8[1] = argv[1];
+
+	if (argc == 4)
+	{
+		utf8[2] = auto_level;
+		utf8[3] = input_file;
+	}
+	else if (argc == 3)
+	{
+		utf8[2] = input_file;
+	}
+	for (int i = 0; i < (ssize_t)argc; i++)
+	{
+		if (utf8[i] == (char *)NULL)
+		{
+			for (i--; i >= 0; i--)
+			{
+				if (utf8[i])
+				{
+					free(utf8[i]);
+				}
+			}
+		}
+	}
+	return utf8;
+}
+
+void FlushJsonOutput(rapidjson::Document& doc, OFFilename output_json_name)
+{
+	rapidjson::StringBuffer buffer_json;
+	buffer_json.Clear();
+	rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer_json);
+	doc.Accept(writer);
+
+	const char *buffer_to_write = buffer_json.GetString();
+	int buffer_size = buffer_json.GetSize();
+
+	DcmOutputFileStream output_writer(output_json_name);
+	offile_off_t remaining = buffer_size, written;
+	while (remaining > 0)
+	{
+		written = output_writer.write(buffer_to_write, remaining);
+		if (written == 0)
+		{
+			break;
+		}
+		buffer_to_write += written;
+		remaining -= written;
+	}
+}
+
+
+// this macro either expands to main() or wmain()
+DCMTK_MAIN_FUNCTION
 {
     OFConsoleApplication app(OFFIS_CONSOLE_APPLICATION, consoleDescription, rcsid);
     OFCommandLine cmd;
+
+#ifdef DCMTK_USE_WCHAR_T
+	char **argv;
+	argv = (char **)malloc(argc * sizeof(*argv));
+	for (int i = 0; i < argc; i++)
+	{
+		argv[i] = create_utf8_string(wargv[i]);
+// 		printf("%s\n", argv[i]);
+	}
+#endif
+
+	double dpi_value = 0;
+	char* output_file = NULL;
+	argv = JsonToUTF8Args(argc, argv, dpi_value, output_file);
+
+	OFFilename input_file(argv[argc - 1], true);
 
     E_FileReadMode      opt_readMode = ERM_autoDetect;    /* default: fileformat or dataset */
     E_TransferSyntax    opt_transferSyntax = EXS_Unknown; /* default: xfer syntax recognition */
@@ -905,8 +1160,13 @@ int main(int argc, char *argv[])
     DJLSDecoderRegistration::registerCodecs();
 #endif
 
+	OFFilename output_json_name(output_file, true);
+	rapidjson::Document doc;
+	doc.SetObject();
+	rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+
     DcmFileFormat *dfile = new DcmFileFormat();
-    OFCondition cond = dfile->loadFile(opt_ifname, opt_transferSyntax, EGL_withoutGL, DCM_MaxReadLength, opt_readMode);
+    OFCondition cond = dfile->loadFile(input_file, opt_transferSyntax, EGL_withoutGL, DCM_MaxReadLength, opt_readMode);
 
     if (cond.bad())
     {
@@ -1091,6 +1351,38 @@ int main(int argc, char *argv[])
           OFLOG_INFO(dcm2pnmLogger, "  minimum pixel value : " << minmaxText);
         }
     }
+
+	DcmElement *value;
+	double x_res, y_res;
+	if (dataset->findAndGetElement(DCM_PixelSpacing, value).good())
+	{
+		int len = value->getNumberOfValues();
+		OFString val1, val2;
+		value->getOFString(val1, 0);
+		value->getOFString(val2, 0);
+		double x_spacing = std::stod(val1.c_str());
+		double y_spacing = std::stod(val2.c_str());
+		// There are 25.4 mm in an inch.
+		// There will be 25.4 * (1/<>_spacing) pixels in an inch
+		x_res = 25.4 / x_spacing;
+		y_res = 25.4 / y_spacing;
+	}
+	else
+	{
+		if (dpi_value == 0)
+		{
+			x_res = y_res = 72.0;
+		}
+		else
+		{
+			x_res = y_res = dpi_value;
+		}
+	}
+
+	rapidjson::Value Resolution(rapidjson::kArrayType);
+	Resolution.PushBack(x_res, allocator);
+	Resolution.PushBack(y_res, allocator);
+	doc.AddMember("Resolution", Resolution, allocator);
 
     if (!opt_suppressOutput)
     {
@@ -1403,127 +1695,235 @@ int main(int argc, char *argv[])
                 << fcount << " frames");
         }
 
-        for (unsigned int frame = 0; frame < fcount; frame++)
-        {
-            if (opt_ofname)
-            {
-                /* output to file */
-                if (opt_multiFrame)
-                {
-                    OFOStringStream stream;
-                    /* generate output filename */
-                    stream << opt_ofname << ".";
-                    if (opt_useFrameNumber)
-                        stream << "f" << (opt_frame + frame);
-                    else
-                        stream << frame;
-                    stream << "." << ofext << OFStringStream_ends;
-                    /* convert string stream into a character string */
-                    OFSTRINGSTREAM_GETSTR(stream, buffer_str)
-                    ofname.assign(buffer_str);
-                    OFSTRINGSTREAM_FREESTR(buffer_str)
-                } else
-                    ofname.assign(opt_ofname);
-                OFLOG_INFO(dcm2pnmLogger, "writing frame " << (opt_frame + frame) << " to " << ofname);
-                ofile = fopen(ofname.c_str(), "wb");
-                if (ofile == NULL)
-                {
-                    OFLOG_FATAL(dcm2pnmLogger, "cannot create file " << ofname);
-                    return 1;
-                }
-            } else {
-                /* output to stdout */
-                ofile = stdout;
-                OFLOG_INFO(dcm2pnmLogger, "writing frame " << (opt_frame + frame) << " to stdout");
-            }
+		int num_frames = fcount;
+		doc.AddMember("Number_frames", num_frames, allocator);
+		
+		rapidjson::Value FrameCollection(rapidjson::kArrayType);
+		// The loop where all frame info are added to the json document
+		// The images corresponding to individual frames are written to the output
+		for (unsigned int frame = 0; frame < fcount; frame++)
+		{
+			unsigned int frame_width = di->getWidth();
+			unsigned int frame_height = di->getHeight();
+			unsigned int frame_depth = di->getDepth();
+			unsigned int rounded_depth = frame_depth;
+			rounded_depth = 8;
+			if (frame_depth <= 8)
+			{
+				rounded_depth = 8;
+			}
+			else if (frame_depth <= 16)
+			{
+				rounded_depth = 16;
+			}
+			else
+			{
+				rounded_depth = 32;
+			}
 
-            /* finally create output image file */
+			rapidjson::Value frame_info(rapidjson::kArrayType);
+			frame_info.SetObject();
 
-            switch (opt_fileType)
-            {
-                case EFT_RawPNM:
-                    result = di->writeRawPPM(ofile, 8, frame);
-                    break;
-                case EFT_8bitPNM:
-                    result = di->writePPM(ofile, 8, frame);
-                    break;
-                case EFT_16bitPNM:
-                    result = di->writePPM(ofile, 16, frame);
-                    break;
-                case EFT_NbitPNM:
-                    result = di->writePPM(ofile, OFstatic_cast(int, opt_fileBits), frame);
-                    break;
-                case EFT_BMP:
-                    result = di->writeBMP(ofile, 0, frame);
-                    break;
-                case EFT_8bitBMP:
-                    result = di->writeBMP(ofile, 8, frame);
-                    break;
-                case EFT_24bitBMP:
-                    result = di->writeBMP(ofile, 24, frame);
-                    break;
-                case EFT_32bitBMP:
-                    result = di->writeBMP(ofile, 32, frame);
-                    break;
-#ifdef BUILD_DCM2PNM_AS_DCMJ2PNM
-                case EFT_JPEG:
-                    {
-                        /* initialize JPEG plugin */
-                        DiJPEGPlugin plugin;
-                        plugin.setQuality(OFstatic_cast(unsigned int, opt_quality));
-                        plugin.setSampling(opt_sampling);
-                        result = di->writePluginFormat(&plugin, ofile, frame);
-                    }
-                    break;
-#endif
-#ifdef WITH_LIBTIFF
-                case EFT_TIFF:
-                    {
-                        /* initialize TIFF plugin */
-                        DiTIFFPlugin tiffPlugin;
-                        tiffPlugin.setCompressionType(opt_tiffCompression);
-                        tiffPlugin.setLZWPredictor(opt_lzwPredictor);
-                        tiffPlugin.setRowsPerStrip(OFstatic_cast(unsigned long, opt_rowsPerStrip));
-                        result = di->writePluginFormat(&tiffPlugin, ofile, frame);
-                    }
-                    break;
-#endif
-#ifdef WITH_LIBPNG
-                case EFT_PNG:
-                case EFT_16bitPNG:
-                    {
-                        /* initialize PNG plugin */
-                        DiPNGPlugin pngPlugin;
-                        pngPlugin.setInterlaceType(opt_interlace);
-                        pngPlugin.setMetainfoType(opt_metainfo);
-                        if (opt_fileType == EFT_16bitPNG)
-                            pngPlugin.setBitsPerSample(16);
-                        result = di->writePluginFormat(&pngPlugin, ofile, frame);
-                    }
-                    break;
-#endif
-#ifdef PASTEL_COLOR_OUTPUT
-                case EFT_PastelPNM:
-                    result = di->writePPM(ofile, MI_PastelColor, frame);
-                    break;
-#endif
-                default:
-                    if (opt_ofname)
-                        result = di->writeRawPPM(ofile, 8, frame);
-                    else /* stdout */
-                        result = di->writePPM(ofile, 8, frame);
-                    break;
-            }
+			rapidjson::Value Frame_width(rapidjson::kArrayType);
+			frame_info.AddMember("width", frame_width, allocator);
 
-            if (opt_ofname)
-                fclose(ofile);
+			rapidjson::Value Frame_height(rapidjson::kArrayType);
+			frame_info.AddMember("height", frame_height, allocator);
 
-            if (!result)
-            {
-                OFLOG_FATAL(dcm2pnmLogger, "cannot write frame");
-                return 1;
-            }
-        }
+			rapidjson::Value Frame_depth(rapidjson::kArrayType);
+			frame_info.AddMember("bits_per_sample", rounded_depth, allocator);
+
+			char aspectRatio[30];
+			OFStandard::ftoa(aspectRatio, sizeof(aspectRatio), di->getHeightWidthRatio(), OFStandard::ftoa_format_f, 0, 2);
+			rapidjson::Value Aspect_ratio;
+			Aspect_ratio.SetString(aspectRatio, allocator);
+			frame_info.AddMember("aspect_ratio", Aspect_ratio, allocator);
+
+			const char *colorModel;
+			colorModel = di->getString(di->getPhotometricInterpretation());
+			if (colorModel == NULL)
+				colorModel = "unknown";
+			rapidjson::Value Color_model;
+			Color_model.SetString(colorModel, allocator);
+			frame_info.AddMember("color_model", Color_model, allocator);
+
+			std::string new_output_image(output_file);
+			new_output_image += std::to_string(frame);
+			const char *output_filename = new_output_image.c_str();
+
+			rapidjson::Value Output_filename;
+			Output_filename.SetString(output_filename, allocator);
+			frame_info.AddMember("output_file", Output_filename, allocator);
+
+			unsigned long data_size = di->getOutputDataSize(rounded_depth);
+			char * buffer = new char[data_size];
+			char * buffer_original = buffer;
+			int status_code = di->getOutputData(buffer, data_size, rounded_depth, frame);
+
+			dataset->print(std::cout);
+			if (rounded_depth > 8)
+			// 			void ConvertLE2BE(UChar * pbuf, size_t buf_sz, UInt16 bps)
+			{
+				ushort		byps;	// byte per sample
+				unsigned char	tmp;	// temporary variable
+
+				/* Calculate how many bytes are used by each sample */
+				byps = rounded_depth / 8;
+
+				/* Swap first byte with last byte, second byte with second to last byte, etc */
+				for (size_t i = 0; i < data_size; i += byps)
+				{
+					for (unsigned j = 0; j < byps - 1 - j; j++)
+					{
+						tmp = *(buffer + i + j);
+						*(buffer + i + j) = *(buffer + i + (byps - 1 - j));
+						*(buffer + i + (byps - 1 - j)) = tmp;
+					}
+				}
+			}
+
+			OFFilename image_output_filename(output_filename, true);
+			DcmOutputFileStream output_writer(image_output_filename);
+			offile_off_t remaining = data_size, written;
+			while (remaining > 0)
+			{
+				written = output_writer.write(buffer, remaining);
+				if (written == 0)
+				{
+					break;
+				}
+				buffer += written;
+				remaining -= written;
+			}
+			delete[] buffer_original;
+
+			FrameCollection.PushBack(frame_info, allocator);
+		}
+		doc.AddMember("Frame_Info", FrameCollection, allocator);
+
+		FlushJsonOutput(doc, output_json_name);
+		
+//         for (unsigned int frame = 0; frame < fcount; frame++)
+//         {
+//             if (opt_ofname)
+//             {
+//                 /* output to file */
+//                 if (opt_multiFrame)
+//                 {
+//                     OFOStringStream stream;
+//                     /* generate output filename */
+//                     stream << opt_ofname << ".";
+//                     if (opt_useFrameNumber)
+//                         stream << "f" << (opt_frame + frame);
+//                     else
+//                         stream << frame;
+//                     stream << "." << ofext << OFStringStream_ends;
+//                     /* convert string stream into a character string */
+//                     OFSTRINGSTREAM_GETSTR(stream, buffer_str)
+//                     ofname.assign(buffer_str);
+//                     OFSTRINGSTREAM_FREESTR(buffer_str)
+//                 } else
+//                     ofname.assign(opt_ofname);
+//                 OFLOG_INFO(dcm2pnmLogger, "writing frame " << (opt_frame + frame) << " to " << ofname);
+//                 ofile = fopen(ofname.c_str(), "wb");
+//                 if (ofile == NULL)
+//                 {
+//                     OFLOG_FATAL(dcm2pnmLogger, "cannot create file " << ofname);
+//                     return 1;
+//                 }
+//             } else {
+//                 /* output to stdout */
+//                 ofile = stdout;
+//                 OFLOG_INFO(dcm2pnmLogger, "writing frame " << (opt_frame + frame) << " to stdout");
+//             }
+// 
+//             /* finally create output image file */
+// 
+//             switch (opt_fileType)
+//             {
+//                 case EFT_RawPNM:
+//                     result = di->writeRawPPM(ofile, 8, frame);
+//                     break;
+//                 case EFT_8bitPNM:
+//                     result = di->writePPM(ofile, 8, frame);
+//                     break;
+//                 case EFT_16bitPNM:
+//                     result = di->writePPM(ofile, 16, frame);
+//                     break;
+//                 case EFT_NbitPNM:
+//                     result = di->writePPM(ofile, OFstatic_cast(int, opt_fileBits), frame);
+//                     break;
+//                 case EFT_BMP:
+//                     result = di->writeBMP(ofile, 0, frame);
+//                     break;
+//                 case EFT_8bitBMP:
+//                     result = di->writeBMP(ofile, 8, frame);
+//                     break;
+//                 case EFT_24bitBMP:
+//                     result = di->writeBMP(ofile, 24, frame);
+//                     break;
+//                 case EFT_32bitBMP:
+//                     result = di->writeBMP(ofile, 32, frame);
+//                     break;
+// #ifdef BUILD_DCM2PNM_AS_DCMJ2PNM
+//                 case EFT_JPEG:
+//                     {
+//                         /* initialize JPEG plugin */
+//                         DiJPEGPlugin plugin;
+//                         plugin.setQuality(OFstatic_cast(unsigned int, opt_quality));
+//                         plugin.setSampling(opt_sampling);
+//                         result = di->writePluginFormat(&plugin, ofile, frame);
+//                     }
+//                     break;
+// #endif
+// #ifdef WITH_LIBTIFF
+//                 case EFT_TIFF:
+//                     {
+//                         /* initialize TIFF plugin */
+//                         DiTIFFPlugin tiffPlugin;
+//                         tiffPlugin.setCompressionType(opt_tiffCompression);
+//                         tiffPlugin.setLZWPredictor(opt_lzwPredictor);
+//                         tiffPlugin.setRowsPerStrip(OFstatic_cast(unsigned long, opt_rowsPerStrip));
+//                         result = di->writePluginFormat(&tiffPlugin, ofile, frame);
+//                     }
+//                     break;
+// #endif
+// #ifdef WITH_LIBPNG
+//                 case EFT_PNG:
+//                 case EFT_16bitPNG:
+//                     {
+//                         /* initialize PNG plugin */
+//                         DiPNGPlugin pngPlugin;
+//                         pngPlugin.setInterlaceType(opt_interlace);
+//                         pngPlugin.setMetainfoType(opt_metainfo);
+//                         if (opt_fileType == EFT_16bitPNG)
+//                             pngPlugin.setBitsPerSample(16);
+//                         result = di->writePluginFormat(&pngPlugin, ofile, frame);
+//                     }
+//                     break;
+// #endif
+// #ifdef PASTEL_COLOR_OUTPUT
+//                 case EFT_PastelPNM:
+//                     result = di->writePPM(ofile, MI_PastelColor, frame);
+//                     break;
+// #endif
+//                 default:
+//                     if (opt_ofname)
+//                         result = di->writeRawPPM(ofile, 8, frame);
+//                     else /* stdout */
+//                         result = di->writePPM(ofile, 8, frame);
+//                     break;
+//             }
+// 
+//             if (opt_ofname)
+//                 fclose(ofile);
+// 
+//             if (!result)
+//             {
+//                 OFLOG_FATAL(dcm2pnmLogger, "cannot write frame");
+//                 return 1;
+//             }
+//         }
     }
 
     /* done, now cleanup. */

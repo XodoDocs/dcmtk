@@ -1,0 +1,10 @@
+project(StaticRapidJsonLib CXX)
+
+file(GLOB RAPIDJSON_SOURCE "*.c" "*.h")
+
+add_custom_command(OUTPUT StaticRapidJsonLib
+        DEPENDS ${RAPIDJSON_SOURCE}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+set_property(TARGET StaticRapidJsonLib PROPERTY FOLDER "CoreLibs/3rdParty")
+
