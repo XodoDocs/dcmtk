@@ -20,14 +20,14 @@
  */
 
 
-#include "rapidjson/document.h"
-#include "rapidjson/writer.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/filewritestream.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/filereadstream.h"
+#include "RapidJson/document.h"
+#include "RapidJson/writer.h"
+#include "RapidJson/stringbuffer.h"
+#include "RapidJson/filewritestream.h"
+#include "RapidJson/prettywriter.h"
+#include "RapidJson/filereadstream.h"
 
-
+#include <cstdlib>
 #include "dcmtk/config/osconfig.h"    /* make sure OS specific configuration is included first */
 
 #define INCLUDE_CSTDIO
@@ -194,7 +194,7 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 	FILE *fopen = fopen_utf8(json_file, "rb");
 	if (!fopen)
 	{
-		OFLOG_FATAL(dcm2pnmLogger, "E: Could not open file ", argv[1], " for reading!");
+		std::cout << "Could not open file ", argv[1], " for reading!\n";
 		return NULL;
 	}
 
@@ -215,7 +215,7 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 		buffer = (char*)malloc(sizeof(char) * (string_size + 1));
 		if (!buffer)
 		{
-			OFLOG_FATAL(dcm2pnmLogger, "E: Could not allocate memory needed");
+			std::cout << "Could not allocate memory needed\n";
 			return NULL;
 		}
 
@@ -228,7 +228,7 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 
 		if (string_size != read_size)
 		{
-			OFLOG_FATAL(dcm2pnmLogger, "E: Could not read the file ", argv[1], " properly");
+			std::cout << "E: Could not read the file ", argv[1], " properly\n";
 
 			// the buffer to NULL
 			free(buffer);
@@ -239,7 +239,7 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 	rapidjson::Document document;
 	if (document.Parse(buffer).HasParseError())
 	{
-		OFLOG_FATAL(dcm2pnmLogger, "E: Could not parse the JSON file ", argv[1]);
+		std::cout << "E: Could not parse the JSON file " <<  argv[1] << std::endl;
 		free(buffer);
 		return NULL;
 	}
@@ -299,7 +299,7 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 	utf8 = (char **) malloc(argc * sizeof(*utf8));
 	if (utf8 == (char **)NULL)
 	{
-		OFLOG_FATAL(dcm2pnmLogger, "E: Could not allocate enough memory");
+		std::cout << "Could not allocate enough memory\n";
 		return NULL;
 	}
 
@@ -1390,8 +1390,9 @@ DCMTK_MAIN_FUNCTION
 		OFString val1, val2;
 		value->getOFString(val1, 0);
 		value->getOFString(val2, 0);
-		double x_spacing = std::stod(val1.c_str());
-		double y_spacing = std::stod(val2.c_str());
+                
+		double x_spacing = std::strtod(val1.c_str(), NULL);
+		double y_spacing = std::strtod(val2.c_str(), NULL);
 		if (x_spacing == 0 || y_spacing == 0)
 		{
 			// Erroneous x_spacing or y_spacing
@@ -1847,7 +1848,9 @@ DCMTK_MAIN_FUNCTION
 			frame_info.AddMember("color_model", Color_model, allocator);
 
 			std::string new_output_image(output_file);
-			new_output_image += std::to_string(frame);
+                        std::stringstream frame_stream;
+                        frame_stream << frame;
+                        new_output_image += frame_stream.str();
 			const char *output_filename = new_output_image.c_str();
 
 			rapidjson::Value Output_filename;
