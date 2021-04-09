@@ -194,7 +194,7 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 	FILE *fopen = fopen_utf8(json_file, "rb");
 	if (!fopen)
 	{
-		printf("Could not open file %s for reading!\n", argv[1]);
+		OFLOG_FATAL(dcm2pnmLogger, "E: Could not open file ", argv[1], " for reading!");
 		return NULL;
 	}
 
@@ -215,7 +215,7 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 		buffer = (char*)malloc(sizeof(char) * (string_size + 1));
 		if (!buffer)
 		{
-			printf("Could not allocate memory needed!\n");
+			OFLOG_FATAL(dcm2pnmLogger, "E: Could not allocate memory needed");
 			return NULL;
 		}
 
@@ -228,7 +228,8 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 
 		if (string_size != read_size)
 		{
-			printf("Could not read the file %s properly!\n", argv[1]);
+			OFLOG_FATAL(dcm2pnmLogger, "E: Could not read the file ", argv[1], " properly");
+
 			// the buffer to NULL
 			free(buffer);
 			return NULL;
@@ -238,7 +239,7 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 	rapidjson::Document document;
 	if (document.Parse(buffer).HasParseError())
 	{
-		printf("Could not parse the JSON file %s\n", argv[1]);
+		OFLOG_FATAL(dcm2pnmLogger, "E: Could not parse the JSON file ", argv[1]);
 		free(buffer);
 		return NULL;
 	}
@@ -246,7 +247,6 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 	////////////////////////////////////////////////////////////////////////////
 	// 2. Access values in document.
 
-	printf("\nAccess values in document:\n");
 	assert(document.IsObject());    // Document is a JSON value represents the root of DOM. Root can be either an object or array.
 
 	assert(document.HasMember("User-options"));
@@ -299,7 +299,7 @@ char** JsonToUTF8Args(int& argc, char** argv, double& dpi_value, char*& output_f
 	utf8 = (char **) malloc(argc * sizeof(*utf8));
 	if (utf8 == (char **)NULL)
 	{
-		printf("Error with memory allocation\n");
+		OFLOG_FATAL(dcm2pnmLogger, "E: Could not allocate enough memory");
 		return NULL;
 	}
 
@@ -362,13 +362,13 @@ DCMTK_MAIN_FUNCTION
     OFConsoleApplication app(OFFIS_CONSOLE_APPLICATION, consoleDescription, rcsid);
     OFCommandLine cmd;
 
+	assert(argc == 3);
 #ifdef DCMTK_USE_WCHAR_T
 	char **argv;
 	argv = (char **)malloc(argc * sizeof(*argv));
 	for (int i = 0; i < argc; i++)
 	{
 		argv[i] = create_utf8_string(wargv[i]);
-// 		printf("%s\n", argv[i]);
 	}
 #endif
 
@@ -376,7 +376,24 @@ DCMTK_MAIN_FUNCTION
 	char* output_file = NULL;
 	argv = JsonToUTF8Args(argc, argv, dpi_value, output_file);
 
+	if (argv == NULL)
+	{
+		return -1;
+	}
+
 	OFFilename input_file(argv[argc - 1], true);
+	OFFilename output_json_name(output_file, true);
+
+	if (input_file.isEmpty() || output_json_name.isEmpty())
+	{
+		OFLOG_FATAL(dcm2pnmLogger, "Input filename or output filename is empty");
+		return -1;
+	}
+
+	rapidjson::Document doc;
+	doc.SetObject();
+	rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+
 
     E_FileReadMode      opt_readMode = ERM_autoDetect;    /* default: fileformat or dataset */
     E_TransferSyntax    opt_transferSyntax = EXS_Unknown; /* default: xfer syntax recognition */
@@ -1160,17 +1177,16 @@ DCMTK_MAIN_FUNCTION
     DJLSDecoderRegistration::registerCodecs();
 #endif
 
-	OFFilename output_json_name(output_file, true);
-	rapidjson::Document doc;
-	doc.SetObject();
-	rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
-
     DcmFileFormat *dfile = new DcmFileFormat();
     OFCondition cond = dfile->loadFile(input_file, opt_transferSyntax, EGL_withoutGL, DCM_MaxReadLength, opt_readMode);
 
     if (cond.bad())
     {
-        OFLOG_FATAL(dcm2pnmLogger, cond.text() << ": reading file: " << opt_ifname);
+//         OFLOG_FATAL(dcm2pnmLogger, cond.text() << ": reading file: " << opt_ifname);
+		rapidjson::Value Error;
+		Error.SetString("Problem loading the input dicom file", allocator);
+		doc.AddMember("Error", Error, allocator);
+		FlushJsonOutput(doc, output_json_name);
         return 1;
     }
 
@@ -1194,15 +1210,29 @@ DCMTK_MAIN_FUNCTION
     }
 
     DicomImage *di = new DicomImage(dfile, xfer, opt_compatibilityMode, opt_frame - 1, opt_frameCount);
+
+	const char *xfer_text = DcmXfer(xfer).getXferName();
+	rapidjson::Value Xfer;
+	Xfer.SetString(xfer_text, allocator);
+	doc.AddMember("Transfer_Syntax", Xfer, allocator);
+
     if (di == NULL)
     {
-        OFLOG_FATAL(dcm2pnmLogger, "Out of memory");
+//        OFLOG_FATAL(dcm2pnmLogger, "Out of memory");
+		rapidjson::Value Error;
+		Error.SetString("Out of memory", allocator);
+		doc.AddMember("Error", Error, allocator);
+		FlushJsonOutput(doc, output_json_name);
         return 1;
     }
 
     if (di->getStatus() != EIS_Normal)
     {
-        OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(di->getStatus()));
+//        OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(di->getStatus()));
+		rapidjson::Value Error;
+		Error.SetString(DicomImage::getString(di->getStatus()), allocator);
+		doc.AddMember("Error", Error, allocator);
+		FlushJsonOutput(doc, output_json_name);
         return 1;
     }
 
@@ -1362,10 +1392,25 @@ DCMTK_MAIN_FUNCTION
 		value->getOFString(val2, 0);
 		double x_spacing = std::stod(val1.c_str());
 		double y_spacing = std::stod(val2.c_str());
-		// There are 25.4 mm in an inch.
-		// There will be 25.4 * (1/<>_spacing) pixels in an inch
-		x_res = 25.4 / x_spacing;
-		y_res = 25.4 / y_spacing;
+		if (x_spacing == 0 || y_spacing == 0)
+		{
+			// Erroneous x_spacing or y_spacing
+			if (dpi_value == 0)
+			{
+				x_res = y_res = 72.0;
+			}
+			else
+			{
+				x_res = y_res = dpi_value;
+			}
+		}
+		else
+		{
+			// There are 25.4 mm in an inch.
+			// There will be 25.4 * (1/<>_spacing) pixels in an inch
+			x_res = 254000 / (x_spacing * 10000);
+			y_res = 254000 / (y_spacing * 10000);
+		}
 	}
 	else
 	{
@@ -1389,7 +1434,14 @@ DCMTK_MAIN_FUNCTION
         /* try to select frame */
         if (opt_frame != di->getFirstFrame() + 1)
         {
-            OFLOG_FATAL(dcm2pnmLogger, "cannot select frame " << opt_frame << ", invalid frame number");
+//            OFLOG_FATAL(dcm2pnmLogger, "cannot select frame " << opt_frame << ", invalid frame number");
+			rapidjson::Value Error;
+			std::ostringstream oss;
+			oss << "cannot select frame " << opt_frame << ", invalid frame number";
+			std::string error_string = oss.str();
+			Error.SetString(error_string.c_str(), allocator);
+			doc.AddMember("Error", Error, allocator);
+			FlushJsonOutput(doc, output_json_name);
             return 1;
         }
 
@@ -1401,12 +1453,20 @@ DCMTK_MAIN_FUNCTION
              DicomImage *newimage = di->createMonochromeImage();
              if (newimage == NULL)
              {
-                OFLOG_FATAL(dcm2pnmLogger, "Out of memory or cannot convert to monochrome image");
+//                OFLOG_FATAL(dcm2pnmLogger, "Out of memory or cannot convert to monochrome image");
+				rapidjson::Value Error;
+				Error.SetString("Out of memory or cannot convert to monochrome image", allocator);
+				doc.AddMember("Error", Error, allocator);
+				FlushJsonOutput(doc, output_json_name);
                 return 1;
              }
              else if (newimage->getStatus() != EIS_Normal)
              {
-                OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
+//                OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
+				rapidjson::Value Error;
+				Error.SetString(DicomImage::getString(newimage->getStatus()), allocator);
+				doc.AddMember("Error", Error, allocator);
+				FlushJsonOutput(doc, output_json_name);
                 return 1;
              }
              else
@@ -1443,8 +1503,17 @@ DCMTK_MAIN_FUNCTION
             case 1: /* use the n-th VOI window from the image file */
                 if ((opt_windowParameter < 1) || (opt_windowParameter > di->getWindowCount()))
                 {
-                    OFLOG_FATAL(dcm2pnmLogger, "cannot select VOI window " << opt_windowParameter << ", only "
-                        << di->getWindowCount() << " window(s) in file");
+//                    OFLOG_FATAL(dcm2pnmLogger, "cannot select VOI window " << opt_windowParameter << ", only "
+//                        << di->getWindowCount() << " window(s) in file");
+
+					rapidjson::Value Error;
+					std::ostringstream oss;
+					oss << "cannot select VOI window " << opt_windowParameter << ", only "
+						<< di->getWindowCount() << " window(s) in file";					
+					std::string error_string = oss.str();
+					Error.SetString(error_string.c_str(), allocator);
+					doc.AddMember("Error", Error, allocator);
+					FlushJsonOutput(doc, output_json_name);
                     return 1;
                 }
                 OFLOG_INFO(dcm2pnmLogger, "activating VOI window " << opt_windowParameter);
@@ -1454,8 +1523,16 @@ DCMTK_MAIN_FUNCTION
             case 2: /* use the n-th VOI look up table from the image file */
                 if ((opt_windowParameter < 1) || (opt_windowParameter > di->getVoiLutCount()))
                 {
-                    OFLOG_FATAL(dcm2pnmLogger, "cannot select VOI LUT " << opt_windowParameter << ", only "
-                        << di->getVoiLutCount() << " LUT(s) in file");
+//                    OFLOG_FATAL(dcm2pnmLogger, "cannot select VOI LUT " << opt_windowParameter << ", only "
+//                        << di->getVoiLutCount() << " LUT(s) in file");
+					rapidjson::Value Error;
+					std::ostringstream oss;
+					oss << "cannot select VOI LUT " << opt_windowParameter << ", only "
+						<< di->getVoiLutCount() << " LUT(s) in file";
+					std::string error_string = oss.str();
+					Error.SetString(error_string.c_str(), allocator);
+					doc.AddMember("Error", Error, allocator);
+					FlushJsonOutput(doc, output_json_name);
                     return 1;
                 }
                 OFLOG_INFO(dcm2pnmLogger, "activating VOI LUT " << opt_windowParameter);
@@ -1536,12 +1613,27 @@ DCMTK_MAIN_FUNCTION
              DicomImage *newimage = di->createClippedImage(opt_left, opt_top, opt_width, opt_height);
              if (newimage == NULL)
              {
-                 OFLOG_FATAL(dcm2pnmLogger, "clipping to (" << opt_left << "," << opt_top << "," << opt_width
-                     << "," << opt_height << ") failed");
+//                 OFLOG_FATAL(dcm2pnmLogger, "clipping to (" << opt_left << "," << opt_top << "," << opt_width
+//                     << "," << opt_height << ") failed");
+				 rapidjson::Value Error;
+				 std::ostringstream oss;
+				 oss << "clipping to (" << opt_left << "," << opt_top << "," << opt_width
+					 << "," << opt_height << ") failed";
+				 std::string error_string = oss.str();
+				 Error.SetString(error_string.c_str(), allocator);
+				 doc.AddMember("Error", Error, allocator);
+				 FlushJsonOutput(doc, output_json_name);
                  return 1;
              } else if (newimage->getStatus() != EIS_Normal)
              {
-                 OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
+//                 OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
+				 rapidjson::Value Error;
+				 std::ostringstream oss;
+				 oss << DicomImage::getString(newimage->getStatus());
+				 std::string error_string = oss.str();
+				 Error.SetString(error_string.c_str(), allocator);
+				 doc.AddMember("Error", Error, allocator);
+				 FlushJsonOutput(doc, output_json_name);
                  return 1;
              }
              else
@@ -1643,12 +1735,20 @@ DCMTK_MAIN_FUNCTION
             }
             if (newimage == NULL)
             {
-                OFLOG_FATAL(dcm2pnmLogger, "Out of memory or cannot scale image");
+//                OFLOG_FATAL(dcm2pnmLogger, "Out of memory or cannot scale image");
+				rapidjson::Value Error;
+				Error.SetString("Out of memory or cannot scale image", allocator);
+				doc.AddMember("Error", Error, allocator);
+				FlushJsonOutput(doc, output_json_name);
                 return 1;
             }
             else if (newimage->getStatus() != EIS_Normal)
             {
-                OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
+//                OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
+				rapidjson::Value Error;
+				Error.SetString(DicomImage::getString(newimage->getStatus()), allocator);
+				doc.AddMember("Error", Error, allocator);
+				FlushJsonOutput(doc, output_json_name);
                 return 1;
             }
             else
@@ -1696,7 +1796,7 @@ DCMTK_MAIN_FUNCTION
         }
 
 		int num_frames = fcount;
-		doc.AddMember("Number_frames", num_frames, allocator);
+		doc.AddMember("Number_Frames", num_frames, allocator);
 		
 		rapidjson::Value FrameCollection(rapidjson::kArrayType);
 		// The loop where all frame info are added to the json document
@@ -1707,12 +1807,11 @@ DCMTK_MAIN_FUNCTION
 			unsigned int frame_height = di->getHeight();
 			unsigned int frame_depth = di->getDepth();
 			unsigned int rounded_depth = frame_depth;
-			rounded_depth = 8;
 			if (frame_depth <= 8)
 			{
 				rounded_depth = 8;
 			}
-			else if (frame_depth <= 16)
+			else if (frame_depth <= 24)
 			{
 				rounded_depth = 16;
 			}
@@ -1760,9 +1859,9 @@ DCMTK_MAIN_FUNCTION
 			char * buffer_original = buffer;
 			int status_code = di->getOutputData(buffer, data_size, rounded_depth, frame);
 
-			dataset->print(std::cout);
+// 			dataset->print(std::cout);
 			if (rounded_depth > 8)
-			// 			void ConvertLE2BE(UChar * pbuf, size_t buf_sz, UInt16 bps)
+// 			void ConvertLE2BE(UChar * pbuf, size_t buf_sz, UInt16 bps)
 			{
 				ushort		byps;	// byte per sample
 				unsigned char	tmp;	// temporary variable
