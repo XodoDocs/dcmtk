@@ -82,6 +82,7 @@ class static_OFLog_initializer
 
 void OFLog::configureLogger(dcmtk::log4cplus::LogLevel level)
 {
+	level = dcmtk::log4cplus::OFF_LOG_LEVEL;
     // This assumes that OFLog_init() was already called. We keep using its
     // setup and just change the log level.
     dcmtk::log4cplus::Logger rootLogger = dcmtk::log4cplus::Logger::getRoot();
