@@ -66,7 +66,7 @@ static void OFLog_init()
 
     console->setLayout(OFmove(layout));
     rootLogger.addAppender(console);
-    rootLogger.setLogLevel(dcmtk::log4cplus::INFO_LOG_LEVEL);
+    rootLogger.setLogLevel(dcmtk::log4cplus::OFF_LOG_LEVEL);
 }
 
 // private class, this class's constructor makes sure that OFLog_init() is

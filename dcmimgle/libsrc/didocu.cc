@@ -116,6 +116,8 @@ void DiDocument::convertPixelData()
     DcmStack pstack;
     OFCondition status;
     DcmXfer xfer(Xfer);
+	DCM_dcmimgleLogger.setLogLevel(OFLogger::OFF_LOG_LEVEL);
+
     DCMIMGLE_DEBUG("transfer syntax of DICOM dataset: " << xfer.getXferName() << " (" << xfer.getXferID() << ")");
     // only search on main dataset level
     if (search(DCM_PixelData, pstack))

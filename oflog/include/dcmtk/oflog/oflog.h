@@ -105,7 +105,7 @@ class DCMTK_LOG4CPLUS_EXPORT OFLog
     /** set up the logging and enable it
      *  @param level the verbosity that you want
      */
-    static void configure(OFLogger::LogLevel level = OFLogger::WARN_LOG_LEVEL);
+    static void configure(OFLogger::LogLevel level = OFLogger::OFF_LOG_LEVEL);
 
     /** handle the command line options used for logging
      *  @param cmd the command line whose options are handled

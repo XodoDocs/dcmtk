@@ -286,19 +286,19 @@ const char *DicomImage::getString(const EI_Status status)
       case EIS_Normal:
         return "Status OK";
       case EIS_NoDataDictionary:
-        return "No data dictionary";
+        return "Could not locate data dictionary that is needed";
       case EIS_InvalidDocument:
-        return "Invalid DICOM document";
+        return "The input is an invalid DICOM document";
       case EIS_MissingAttribute:
-        return "Missing attribute";
+        return "Some key attributes are missing";
       case EIS_InvalidValue:
-        return "Invalid element value";
+        return "An invalid element value has been read";
       case EIS_NotSupportedValue:
-        return "Unsupported element value";
+        return "An unsupported element value has been provided";
       case EIS_MemoryFailure:
-        return "Out of memory";
+        return "The module ran out of memory";
       case EIS_InvalidImage:
-        return "Invalid DICOM image";
+        return "The DICOM image is invalid";
       case EIS_OtherError:
       default:
         return "Unspecified";
