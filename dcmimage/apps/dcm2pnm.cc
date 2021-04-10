@@ -1836,12 +1836,19 @@ DCMTK_MAIN_FUNCTION
 			Aspect_ratio.SetString(aspectRatio, allocator);
 			frame_info.AddMember("aspect_ratio", Aspect_ratio, allocator);
 
-			const char *colorModel;
-			colorModel = di->getString(di->getPhotometricInterpretation());
-			if (colorModel == NULL)
-				colorModel = "unknown";
+			const char *output_color_model;
+			EP_Interpretation photo_interpret = di->getPhotometricInterpretation();
+			switch (photo_interpret)
+			{
+			case EPI_Monochrome1:
+			case EPI_Monochrome2:
+				output_color_model = "MONOCHROME2";
+				break;
+			default:
+				output_color_model = "RGB";
+			}
 			rapidjson::Value Color_model;
-			Color_model.SetString(colorModel, allocator);
+			Color_model.SetString(output_color_model, allocator);
 			frame_info.AddMember("color_model", Color_model, allocator);
 
 			std::string new_output_image(output_file);
