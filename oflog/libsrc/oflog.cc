@@ -82,6 +82,7 @@ class static_OFLog_initializer
 
 void OFLog::configureLogger(dcmtk::log4cplus::LogLevel level)
 {
+	// <Note to skumar> This needs to be commented when I want to debug using logs
 	level = dcmtk::log4cplus::OFF_LOG_LEVEL;
     // This assumes that OFLog_init() was already called. We keep using its
     // setup and just change the log level.

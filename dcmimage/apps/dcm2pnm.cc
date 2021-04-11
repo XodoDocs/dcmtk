@@ -386,7 +386,7 @@ DCMTK_MAIN_FUNCTION
 	dcm2pnmLogger.setLogLevel(OFLogger::OFF_LOG_LEVEL);
 	if (input_file.isEmpty() || output_json_name.isEmpty())
 	{
-// 		OFLOG_FATAL(dcm2pnmLogger, "Input filename or output filename is empty");
+		OFLOG_FATAL(dcm2pnmLogger, "Input filename or output filename is empty");
 		return -1;
 	}
 
@@ -1182,7 +1182,7 @@ DCMTK_MAIN_FUNCTION
 
     if (cond.bad())
     {
-//         OFLOG_FATAL(dcm2pnmLogger, cond.text() << ": reading file: " << input_file);
+        OFLOG_FATAL(dcm2pnmLogger, cond.text() << ": reading file: " << input_file);
 		rapidjson::Value Error;
 		Error.SetString("The input DICOM file could not be loaded as it is not properly formatted", allocator);
 		doc.AddMember("Error", Error, allocator);
@@ -1218,7 +1218,7 @@ DCMTK_MAIN_FUNCTION
 
     if (di == NULL)
     {
-//        OFLOG_FATAL(dcm2pnmLogger, "Out of memory");
+       OFLOG_FATAL(dcm2pnmLogger, "Out of memory");
 	   rapidjson::Value Error;
 	   Error.SetString("The image could not be created because we ran out of memory", allocator);
 	   doc.AddMember("Error", Error, allocator);
@@ -1228,7 +1228,7 @@ DCMTK_MAIN_FUNCTION
 
     if (di->getStatus() != EIS_Normal)
     {
-// 		OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(di->getStatus()));
+		OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(di->getStatus()));
 		rapidjson::Value Error;
 		Error.SetString(DicomImage::getString(di->getStatus()), allocator);
 		doc.AddMember("Error", Error, allocator);
@@ -1435,7 +1435,7 @@ DCMTK_MAIN_FUNCTION
         /* try to select frame */
         if (opt_frame != di->getFirstFrame() + 1)
         {
-//            OFLOG_FATAL(dcm2pnmLogger, "cannot select frame " << opt_frame << ", invalid frame number");
+           OFLOG_FATAL(dcm2pnmLogger, "cannot select frame " << opt_frame << ", invalid frame number");
 		   rapidjson::Value Error;
 		   std::ostringstream oss;
 		   oss << "cannot select frame " << opt_frame << ", invalid frame number";
@@ -1454,7 +1454,7 @@ DCMTK_MAIN_FUNCTION
              DicomImage *newimage = di->createMonochromeImage();
              if (newimage == NULL)
              {
-//                OFLOG_FATAL(dcm2pnmLogger, "Out of memory or cannot convert to monochrome image");
+               OFLOG_FATAL(dcm2pnmLogger, "Out of memory or cannot convert to monochrome image");
 			   rapidjson::Value Error;
 			   Error.SetString("Out of memory or cannot convert to monochrome image", allocator);
 			   doc.AddMember("Error", Error, allocator);
@@ -1463,7 +1463,7 @@ DCMTK_MAIN_FUNCTION
              }
              else if (newimage->getStatus() != EIS_Normal)
              {
-//                OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
+               OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
 			   rapidjson::Value Error;
 			   Error.SetString(DicomImage::getString(newimage->getStatus()), allocator);
 			   doc.AddMember("Error", Error, allocator);
@@ -1504,8 +1504,8 @@ DCMTK_MAIN_FUNCTION
             case 1: /* use the n-th VOI window from the image file */
                 if ((opt_windowParameter < 1) || (opt_windowParameter > di->getWindowCount()))
                 {
-//                    OFLOG_FATAL(dcm2pnmLogger, "cannot select VOI window " << opt_windowParameter << ", only "
-//                        << di->getWindowCount() << " window(s) in file");
+                   OFLOG_FATAL(dcm2pnmLogger, "cannot select VOI window " << opt_windowParameter << ", only "
+                       << di->getWindowCount() << " window(s) in file");
 					rapidjson::Value Error;
 					std::ostringstream oss;
 					oss << "Problem encountered in selecting VOI window " << opt_windowParameter << "\n";
@@ -1522,8 +1522,8 @@ DCMTK_MAIN_FUNCTION
             case 2: /* use the n-th VOI look up table from the image file */
                 if ((opt_windowParameter < 1) || (opt_windowParameter > di->getVoiLutCount()))
                 {
-//                    OFLOG_FATAL(dcm2pnmLogger, "cannot select VOI LUT " << opt_windowParameter << ", only "
-//                        << di->getVoiLutCount() << " LUT(s) in file");
+                   OFLOG_FATAL(dcm2pnmLogger, "cannot select VOI LUT " << opt_windowParameter << ", only "
+                       << di->getVoiLutCount() << " LUT(s) in file");
 					rapidjson::Value Error;
 					std::ostringstream oss;
 					oss << "Problem encountered in selecting VOI LUT " << opt_windowParameter << "\n";
@@ -1611,8 +1611,8 @@ DCMTK_MAIN_FUNCTION
              DicomImage *newimage = di->createClippedImage(opt_left, opt_top, opt_width, opt_height);
              if (newimage == NULL)
              {
-//                 OFLOG_FATAL(dcm2pnmLogger, "clipping to (" << opt_left << "," << opt_top << "," << opt_width
-//                     << "," << opt_height << ") failed");
+                OFLOG_FATAL(dcm2pnmLogger, "clipping to (" << opt_left << "," << opt_top << "," << opt_width
+                    << "," << opt_height << ") failed");
 				rapidjson::Value Error;
 				std::ostringstream oss;
 				oss << "the module is unable to clip (" << opt_left << "," << opt_top << "," << opt_width
@@ -1624,7 +1624,7 @@ DCMTK_MAIN_FUNCTION
 				return 1;
              } else if (newimage->getStatus() != EIS_Normal)
              {
-//                 OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
+                OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
 				rapidjson::Value Error;
 				std::ostringstream oss;
 				oss << DicomImage::getString(newimage->getStatus());
@@ -1733,7 +1733,7 @@ DCMTK_MAIN_FUNCTION
             }
             if (newimage == NULL)
             {
-//                OFLOG_FATAL(dcm2pnmLogger, "Out of memory or cannot scale image");
+               OFLOG_FATAL(dcm2pnmLogger, "Out of memory or cannot scale image");
 			   rapidjson::Value Error;
 			   Error.SetString("The module either ran out of memory in scaling the image", allocator);
 			   doc.AddMember("Error", Error, allocator);
@@ -1742,7 +1742,7 @@ DCMTK_MAIN_FUNCTION
             }
             else if (newimage->getStatus() != EIS_Normal)
             {
-//                OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
+               OFLOG_FATAL(dcm2pnmLogger, DicomImage::getString(newimage->getStatus()));
 			   rapidjson::Value Error;
 			   Error.SetString(DicomImage::getString(newimage->getStatus()), allocator);
 			   doc.AddMember("Error", Error, allocator);
