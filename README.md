@@ -36,3 +36,53 @@ In addition to the API documentation, which is also available [online](https://s
 If you find bugs or other problems with this software, we would appreciate hearing about them.  Please send electronic mail to: bugs/at/dcmtk/dot/org
 
 Please try to describe the problem in detail and if possible give a suggested fix.  For general questions on how to compile, install or use the toolkit we recommend the [public discussion forum](https://forum.dcmtk.org/).
+
+
+
+
+BUILD
+
+The goal of building this repo is to build two applications called `dcm2pnm` and `dcmj2pnm`. 
+Following are the steps in any operating system.
+
+On Windows:
+1. Pull the repo in to any location where there is lot of disk space available. Let the root directory of DCMTK be `$DCMTK`. Checkout the git branch `3.6.6`.
+2. Make a directory called `build` in `$DCMTK`.
+3. Use CMake-GUI to generate Visual Studio solution by giving the directory `$DCMTK` as the source and `$DCMTK/build` as the build directory. I have generated the solution for `Visual Studio 15 2017` but one could use with any more recent generator.
+4. Go to `$DCMTK/build` and open the `DCMTK.sln` with the appropriate Visual Studio version.
+5. Set `Release` mode and build the projects `dcm2pnm` and `dcmj2pnm`.
+6. The executables would be generated and the following executables are of interest.
+a) `$DCMTK\build\bin\Release\dcm2pnm.exe`
+b) `$DCMTK\build\bin\Release\dcmj2pnm.exe`
+7. Rename the file `dcm2pnm.exe` to `pdftrondicom1.dll`.
+8. Rename the file `dcmj2pnm.exe` to `pdftrondicom2.dll`.
+9. Copy the two files to `PDFTronCore/AdvancedImagingModule/Lib/Windows/` folder.
+
+On Linux and Mac:
+1. Same as above for Windows
+2. Same as above for Windows
+3. Execute the three commands on a CLI environment
+ i) `cd $DCMTK/build`
+ ii) `cmake ..`
+ iii) `make`
+4. The executables would be generated and the following executables are of interest.
+a) `$DCMTK/build/bin/dcm2pnm`
+b) `$DCMTK/build/bin/dcmj2pnm`
+5. Rename the file `dcm2pnm` to `pdftrondicom1.so` on Linux and 
+`pdftrondicom1.dylib` on Mac.
+6. Rename the file `dcmj2pnm` to `pdftrondicom2.so` on Linux and
+`pdftrondicom2.dylib` on Mac.
+7. Copy two files to `PDFTronCore/AdvancedImagingModule/Lib/Linux` on Linux
+and `PDFTronCore/AdvancedImagingModule/Lib/MacOS` on MacOS.
+
+USAGE
+
+The executable `dcm2pnm` can be executed with two extra arguments:
+
+The first argument is the utility function we want. It is specifically build to convert between formats.
+So, the first argument is `+Fa` for our purpose. 
+
+The second argument is a JSON file where the input and output files are specified.
+The input file is the file that needs to be converted and the output is what we would like it to be.
+
+We will get a JSON output file and lots of raw image data dumps representing single frames of the DICOM image.
