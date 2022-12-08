@@ -100,8 +100,8 @@ option(DCMTK_ENABLE_PRIVATE_TAGS "Configure DCMTK with support for DICOM private
 option(DCMTK_WITH_THREADS "Configure DCMTK with support for multi-threading." ON)
 option(DCMTK_WITH_DOXYGEN "Build API documentation with DOXYGEN." ON)
 option(DCMTK_GENERATE_DOXYGEN_TAGFILE "Generate a tag file with DOXYGEN." OFF)
-option(DCMTK_WIDE_CHAR_FILE_IO_FUNCTIONS "Build with wide char file I/O functions." OFF)
-option(DCMTK_WIDE_CHAR_MAIN_FUNCTION "Build command line tools with wide char main function." OFF)
+option(DCMTK_WIDE_CHAR_FILE_IO_FUNCTIONS "Build with wide char file I/O functions." ON)
+option(DCMTK_WIDE_CHAR_MAIN_FUNCTION "Build command line tools with wide char main function." ON)
 option(DCMTK_ENABLE_STL "Enable use of native STL classes and algorithms instead of DCMTK's own implementations." OFF)
 
 macro(DCMTK_INFERABLE_OPTION OPTION DESCRIPTION)
