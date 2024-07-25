@@ -25,7 +25,6 @@
 #include "dcmtk/ofstd/ofstd.h"
 #include "dcmtk/ofstd/ofdiag.h"
 #include "dcmtk/ofstd/ofconsol.h"
-
 #include <cerrno>
 
 #ifdef HAVE_WINDOWS_H
